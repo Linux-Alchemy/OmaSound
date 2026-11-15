@@ -1,0 +1,23 @@
+# Private project planning and working notes
+/PLAN.md
+/SCRATCH.md
+/NOTES.md
+/local/
+
+# Local build output and caches
+/build/
+/build-*/
+/out/
+/dist/
+/.cache/
+/.venv/
+__pycache__/
+*.py[cod]
+
+# Editor and temporary files
+*.swp
+*.swo
+*~
+*.tmp
+*.log
+.DS_Store
