@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "linux-alchemy.omasound-dev",
+  "name": "OmaSound Fixture",
+  "version": "0.1.0",
+  "author": "Linux-Alchemy",
+  "description": "Isolated audio-control fixture; does not change sound",
+  "kinds": ["bar-widget", "panel", "service"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml",
+    "panel": "Panel.qml",
+    "service": "Service.qml"
+  },
+  "keepLoaded": true,
+  "barWidget": {
+    "displayName": "OmaSound Fixture",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
