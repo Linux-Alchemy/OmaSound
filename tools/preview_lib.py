@@ -17,6 +17,8 @@ PLUGIN_ID = "linux-alchemy.omasound-dev"
 FILES = (
     "manifest.json", "BarWidget.qml", "Panel.qml", "Service.qml",
     "ui/Action.qml", "ui/Label.qml", "ui/SideControls.qml", "models/Fixture.js",
+    "ui/ProfileEditor.qml", "models/ProfileModel.js", "models/EffectiveState.js",
+    "models/EditSession.js", "models/FakeEngine.js", "models/ProfileController.js",
     "LICENSE", "THIRD_PARTY_NOTICES.md",
 )
 MAX_FILE = 2 * 1024 * 1024
@@ -152,7 +154,7 @@ class Preview:
             raise PreviewError("Owned preview files changed; refusing to overwrite or remove them. Preserve/reconcile the changes first")
         return record
 
-    def wait_status(self, visible: bool) -> dict:
+    def wait_status(self, visible: bool, runtime: str | None = None) -> dict:
         deadline = time.monotonic() + 8
         while time.monotonic() < deadline:
             answer = self.call("call", PLUGIN_ID, "status", "")
@@ -160,7 +162,8 @@ class Preview:
                 status = json.loads(answer)
             except (ValueError, TypeError):
                 status = {}
-            if status.get("mode") == "fixture" and status.get("ready") is True and status.get("visible") is visible:
+            source_matches = runtime is None or status.get("sourceUrl", "").endswith("/" + runtime + "/Panel.qml")
+            if source_matches and status.get("mode") == "fixture" and status.get("ready") is True and status.get("visible") is visible:
                 return status
             time.sleep(0.1)
         raise PreviewError("Fixture did not acknowledge loaded/visible state; inspect the shell log, then run tools/preview --stop")
@@ -173,7 +176,7 @@ class Preview:
         if self.record.exists():
             record = self.load_record()
             for name in FILES:
-                if digest(read_regular(self.repo / name)) != record["hashes"].get(name):
+                if digest(read_regular(self.repo / name)) != record.get("sourceHashes", {}).get(name):
                     raise PreviewError("Checkout changed since staging; stop the existing preview before starting the new version")
         else:
             if self.stage.exists() or self.stage.is_symlink() or contains_id(before):
@@ -182,23 +185,32 @@ class Preview:
             manifest = json.loads(content["manifest.json"])
             if manifest.get("id") != PLUGIN_ID:
                 raise PreviewError("Unexpected development manifest ID")
+            source_hashes = {name: digest(data) for name, data in content.items()}
+            runtime = "runtime_" + digest(json.dumps(source_hashes, sort_keys=True).encode())
+            manifest["entryPoints"] = {key: runtime + "/" + value for key, value in manifest["entryPoints"].items()}
             self.plugins.mkdir(parents=True, exist_ok=True)
             temporary = Path(tempfile.mkdtemp(prefix=".omasound-stage-", dir=self.plugins))
             try:
                 for name, data in content.items():
-                    target = temporary / name
+                    if name == "manifest.json":
+                        target = temporary / name
+                        data = (json.dumps(manifest, indent=2) + "\n").encode()
+                    else:
+                        target = temporary / runtime / name if name.endswith((".qml", ".js")) else temporary / name
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(data)
                 (temporary / ".omasound-owner").write_text(str(uuid.uuid4()) + "\n")
                 hashes = tree_hashes(temporary)
                 # Record before publication, so a crash after rename is recoverable.
-                record = {"version": 1, "repo": str(self.repo), "stage": str(self.stage), "hashes": hashes}
+                record = {"version": 1, "repo": str(self.repo), "stage": str(self.stage), "hashes": hashes,
+                          "sourceHashes": source_hashes, "runtime": runtime}
                 publish(self.record, (json.dumps(record, indent=2) + "\n").encode())
                 os.rename(temporary, self.stage)
             finally:
                 if temporary.exists():
                     shutil.rmtree(temporary)
-        self.call("rescanPlugins")
+        if changed:
+            self.call("rescanPlugins")
         deadline = time.monotonic() + 8
         while True:
             catalog = json.loads(self.call("listPlugins"))
@@ -214,7 +226,7 @@ class Preview:
                 raise PreviewError("Host refused preview enable; owned staging retained for --stop")
         if self.call("summon", PLUGIN_ID, "{}") != "ok":
             raise PreviewError("Host refused fixture open; run tools/preview --stop")
-        status = self.wait_status(True)
+        status = self.wait_status(True, record["runtime"])
         if without_preview(self.read_config()) != without_preview(before):
             raise PreviewError("Configuration changed concurrently or unexpectedly; owned preview retained for inspection/stop")
         return {"ok": True, "changed": changed, "message": "Fixture window loaded; no live audio access", "status": status}

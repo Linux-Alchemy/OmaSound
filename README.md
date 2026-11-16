@@ -2,8 +2,10 @@
 
 An Omarchy audio control window for input/output EQ and saved profiles.
 
-**Current state:** Phase 1 fixture skeleton. The controls are synthetic and do
-not alter audio. Live EQ, profiles and a final layout are not implemented yet.
+**Current state:** Task 2.1 fixture profile editor. Create, apply and edit EQ-only
+profiles with independent input/output settings and reversible drafts. Controls
+are synthetic and do not alter audio. Profiles are saved in memory only;
+disk storage, live EQ and final layout selection are still ahead.
 
 ## Try the fixture
 
@@ -13,6 +15,7 @@ No package installation is performed.
 ```sh
 ./tools/preview --mode fixture --layout baseline
 ./tools/check --scope foundation
+./tools/check --scope model --part transitions
 ./tools/preview --stop
 ```
 
@@ -24,9 +27,11 @@ shortcut remain in place. Preview ownership metadata stays in ignored `local/`.
 
 The check requires a running matching fixture, briefly closes/reopens it, and
 verifies manifest, strict Qt 6 lint, QML formatting, fixture logic, cleanup tests
-and host lifecycle. Missing prerequisites are failures. Only `foundation` exists.
+and host lifecycle. The model transition scope adds profile and QML service tests.
+Checks refuse a dirty editor; save or discard its draft first. Missing
+prerequisites are failures. Full `--scope model` awaits Task 2.2 storage checks.
 
-Follow the [manual lifecycle check](docs/manual-checks.md) for hands-on acceptance.
+Follow the [manual checks](docs/manual-checks.md) for lifecycle and profile acceptance.
 See [contracts](docs/contracts.md), [ADR 0001](docs/decisions/0001-host-boundary.md)
 and [contributing](CONTRIBUTING.md) for boundaries and workflow.
 

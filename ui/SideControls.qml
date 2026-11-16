@@ -8,6 +8,8 @@ ColumnLayout {
     required property string side
     required property var service
     readonly property var sideState: service ? service.state[side] : null
+    readonly property var eq: service ? service.effective[side].eq : null
+    readonly property bool editable: !!service && !service.profileState.pendingAction && (!service.profileState.session || service.profileState.session.included[side])
     spacing: 12
 
     Label {
@@ -39,21 +41,34 @@ ColumnLayout {
         onMoved: root.service.change(root.side, "volume", value, 0)
     }
     RowLayout {
+        enabled: root.editable
         Action {
-            text: root.sideState && root.sideState.enabled ? "EQ fixture: on" : "EQ fixture: off"
-            onClicked: root.service.change(root.side, "enabled", 0, 0)
+            text: root.eq && root.eq.enabled ? "EQ fixture: on" : "EQ fixture: off"
+            onClicked: root.service.eqChange(root.side, "enabled", !root.eq.enabled, 0)
         }
         Action {
             text: "Flat"
-            onClicked: root.service.change(root.side, "flat", 0, 0)
+            onClicked: root.service.eqChange(root.side, "flat", 0, 0)
         }
         Label {
             Layout.fillWidth: true
-            text: "Demonstration bands · no frequencies or gain scale selected"
+            text: "±12 dB · fixture only"
         }
+    }
+    Label {
+        Layout.fillWidth: true
+        text: root.service ? root.service.sideLabel(root.side) + " · " + root.service.observation(root.side) : ""
+    }
+    Label {
+        Layout.fillWidth: true
+        visible: !!root.service && !!root.service.profileState.session && !root.service.profileState.session.included[root.side]
+        text: "Include this side to edit its EQ. Its current settings are preserved."
     }
     RowLayout {
         Layout.fillWidth: true
+        visible: !root.service || !root.service.profileState.session || root.service.profileState.session.included[root.side]
+        enabled: root.editable
+        uniformCellSizes: true
         Repeater {
             model: 10
             ColumnLayout {
@@ -64,15 +79,17 @@ ColumnLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredHeight: 125
                     orientation: Qt.Vertical
-                    from: -1
-                    to: 1
-                    value: root.sideState ? root.sideState.bands[band.index] : 0
+                    from: -12
+                    to: 12
+                    stepSize: 0.5
+                    value: root.eq ? root.eq.gains[band.index] : 0
                     Accessible.name: root.side + " fixture band " + (band.index + 1)
-                    onMoved: root.service.change(root.side, "band", value, band.index)
+                    onMoved: root.service.eqChange(root.side, "gain", value, band.index)
                 }
                 Label {
                     Layout.alignment: Qt.AlignHCenter
-                    text: String(band.index + 1)
+                    text: root.service ? (root.service.frequencies[band.index] >= 1000 ? root.service.frequencies[band.index] / 1000 + "k" : String(root.service.frequencies[band.index])) : ""
+                    font.pixelSize: 12
                 }
             }
         }
