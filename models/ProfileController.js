@@ -6,7 +6,7 @@
 function initialState(seed) {
     var effective = Effective.initialState();
     return { profiles: Profile.factoryFixtures(), committed: effective, session: null, engine: Engine.create(effective),
-        pendingAction: null, closeRequested: false, serial: 0, seed: seed, message: "Profiles are saved in memory only.", error: "",
+        pendingAction: null, closeRequested: false, serial: 0, seed: seed, message: "Fixture EQ profiles.", error: "",
         available: { input: true, output: true }, defer: false, failSide: "", failRestore: false, failSave: false };
 }
 function shown(state) { return state.session ? Edit.previewState(state.session) : state.committed; }
@@ -34,7 +34,7 @@ function perform(state, action) {
     if (action.kind === "apply") {
         state.committed = Effective.applyProfile(state.committed, find(state, action.id));
         sync(state);
-        state.message = "Profile selected in memory; application status is shown per side.";
+        state.message = "Profile selected; application status is shown per side.";
         return;
     }
     if (action.kind === "new" || action.kind === "edit") {
@@ -60,7 +60,7 @@ function save(state) {
     state.committed = committed;
     state.session = null;
     sync(state);
-    state.message = "Saved in memory only. Preview stop will discard this library.";
+    state.message = "Profile committed.";
     return true;
 }
 function transition(current, action) {

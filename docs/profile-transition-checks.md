@@ -48,10 +48,10 @@ checks remain prerequisites.
 ## Command boundary
 
 Task 2.1 implements `./tools/check --scope model --part transitions`. Full
-`--scope model` remains unavailable until Task 2.2's storage checks exist.
+`--scope model` includes the Task 2.2 storage and real-helper runtime checks.
 
 Task 2.1's demo lets Matt create/apply/edit input-only, output-only and combined
 profiles, test independent labels and Save/Cancel, and change ordinary fixture
 controls during an EQ preview. It must continue to state that audio and Save are
-simulated. No persistence, production preset tuning, real device access or final
-layout selection is part of this task.
+simulated. Task 2.2 adds persistence around these transitions. Production preset tuning,
+real device access and final layout selection remain outside the model tasks.

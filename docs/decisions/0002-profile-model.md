@@ -1,6 +1,6 @@
 # ADR 0002: Independent EQ profiles and reversible editing
 
-- **Status:** Model accepted by Matt on 2026-11-16; storage decisions reserved for Task 2.2
+- **Status:** Model and Task 2.2 storage addendum accepted by Matt on 2026-11-16
 - **Date:** 2026-11-16
 
 ## Context
@@ -107,3 +107,49 @@ publication, revision conflicts and recovery still need the later ADR completion
 
 Matt accepted the proposed model package, including numerical band settings, on
 2026-11-16 and authorized implementation of Task 2.1. Storage acceptance is separate.
+
+
+## Task 2.2 storage decision — 2026-11-16
+
+Implementation decision under Matt's authorization to continue Task 2.2 after
+merging Task 2.1. This addendum supersedes the fixture runtime's in-memory-only
+Save behaviour; the pure model remains unchanged. Matt subsequently confirmed
+the persistence fixture works as expected and accepted Phase 2 on 2026-11-16.
+
+- Persist one version-1 `state.json` snapshot containing a store revision,
+  last transaction ID, the custom-profile library and both resolved committed
+  EQ sides/provenance. Factory fixtures remain code-owned. No device, volume,
+  mute, transient engine observation or draft is stored. Maximum 256 custom
+  profiles and 1 MiB per document/request; validate both languages at boundaries.
+- The development helper uses only `$XDG_STATE_HOME/omasound-fixture` (fallback
+  `~/.local/state/omasound-fixture`). Tests override XDG_STATE_HOME with a
+  disposable directory. This is separate from future production state.
+  Preview stop removes the temporary installation but retains this fixture state.
+- Names never become paths; IDs remain data inside the single snapshot. Hold
+  the private root directory descriptor, reject unsafe leaf objects, and use
+  owner-only directories/files. Respect the user's resolved XDG base location;
+  refuse a symlink at the plugin-owned root or any store leaf.
+- Serialize writers with a bounded advisory lock. Commit requires the current
+  revision, writes an exclusive temporary file, fsyncs it, atomically replaces
+  state.json, then fsyncs the directory before acknowledging success. A failure
+  before replace preserves the previous snapshot. Never silently initialize over
+  corrupt/unreadable state. Interrupted temporary files are ignored, not loaded
+  or broadly deleted. Recovery selects only a validated complete state.json.
+- A transaction ID allows an identical retry after a lost acknowledgment to
+  confirm an already-published commit. Failures after publication/transport loss
+  remain unconfirmed until retry/reconciliation; the UI must not claim success
+  or permit a competing save meanwhile. Confirmed pre-publication failure keeps
+  the editable draft and pending navigation. Revision conflicts block writes
+  until an explicit reload, with the draft retained for retry.
+- The one-shot Python helper accepts only load/commit through bounded stdin and
+  emits one bounded ASCII JSON reply. It never invokes a shell or child process.
+  Serialize requests in QML; deadline/termination applies to the owned process.
+  Save/navigation completes only after a validated durable acknowledgment.
+  Outside-editor EQ changes commit the resolved sides; drafts never do.
+- Missing storage is neutral first run; invalid/unavailable storage is a visible
+  blocked state with Retry. Reload/retry never silently overwrites rejected data.
+  Abnormal exit restores the last published committed snapshot, not a draft.
+
+A single snapshot avoids split library/effective-state commits and separate
+profile filenames. It deliberately does not provide automatic backup selection,
+imports, deletion UI, production paths or a live-engine transport.

@@ -26,8 +26,9 @@ On an existing Omarchy session with the documented installed tooling:
 The preview explicitly stages a temporary plugin and bar entry. The check itself
 does not install it: it requires the matching preview already running and briefly
 closes/reopens its window. Task 2.1 also supports
-`./tools/check --scope model --part transitions`; full model/storage and later
-scopes remain unimplemented and fail explicitly. Resolve dirty drafts before
+`./tools/check --scope model --part transitions`; Task 2.2 adds the full
+`./tools/check --scope model` storage gate. Later scopes remain unimplemented
+and fail explicitly. Resolve dirty drafts before
 running host lifecycle checks.
 No dependencies are downloaded by these commands.
 

@@ -14,7 +14,7 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
-        enabled: !root.prompting
+        enabled: !root.prompting && root.service && !root.service.editingBlocked
         Controls.ComboBox {
             id: picker
             Layout.fillWidth: true
@@ -68,7 +68,7 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth: true
         visible: !!root.session
-        enabled: !root.prompting
+        enabled: !root.prompting && root.service && !root.service.editingBlocked
         Controls.TextField {
             Layout.fillWidth: true
             maximumLength: 256
@@ -106,8 +106,8 @@ ColumnLayout {
             })
         }
         Action {
-            text: "Save in memory"
-            enabled: root.service && root.service.saveError === ""
+            text: "Save"
+            enabled: root.service && !root.service.editingBlocked && root.service.saveError === ""
             onClicked: root.service.dispatch({
                 kind: "save"
             })
@@ -134,13 +134,14 @@ ColumnLayout {
         }
         Action {
             text: "Save"
-            enabled: root.service && root.service.saveError === ""
+            enabled: root.service && !root.service.editingBlocked && root.service.saveError === ""
             onClicked: root.service.dispatch({
                 kind: "resolve",
                 choice: "save"
             })
         }
         Action {
+            enabled: root.service && !root.service.editingBlocked
             text: "Discard"
             onClicked: root.service.dispatch({
                 kind: "resolve",
@@ -148,11 +149,25 @@ ColumnLayout {
             })
         }
         Action {
+            enabled: root.service && !root.service.editingBlocked
             text: "Keep editing"
             onClicked: root.service.dispatch({
                 kind: "resolve",
                 choice: "keep"
             })
+        }
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        Label {
+            Layout.fillWidth: true
+            text: root.service ? root.service.storageMessage : "Loading storage…"
+        }
+        Action {
+            text: "Retry / reload storage"
+            visible: root.service && root.service.storageStatus === "blocked"
+            enabled: root.service && !root.service.bridge.active
+            onClicked: root.service.reloadStorage()
         }
     }
     Label {

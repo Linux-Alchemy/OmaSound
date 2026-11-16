@@ -88,9 +88,12 @@ Item {
             visible: root.opened,
             instance: root.instanceId,
             opens: root.openCount,
-            ready: !!root.service && root.service.mode === "fixture",
+            ready: !!root.service && root.service.mode === "fixture" && root.service.storageStatus !== "loading",
+            effective: root.service ? root.service.effective : null,
             dirty: !!root.service && !!root.service.profileState.session && root.service.profileState.session.dirty,
             prompt: !!root.service && !!root.service.profileState.pendingAction,
+            storage: root.service ? root.service.storageStatus : "loading",
+            revision: root.service ? root.service.storeRevision : 0,
             profiles: root.service ? root.service.profileState.profiles.length : 0,
             width: window.width,
             height: window.height
@@ -198,7 +201,7 @@ Item {
                 }
             }
             Ui.Label {
-                text: "Profiles are saved in memory only. Close preserves them; preview stop clears them. Live audio is untouched."
+                text: "Saved fixture profiles and EQ survive preview restart. Unsaved drafts do not. Live audio is untouched."
             }
         }
     }

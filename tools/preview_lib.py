@@ -15,10 +15,12 @@ import uuid
 
 PLUGIN_ID = "linux-alchemy.omasound-dev"
 FILES = (
-    "manifest.json", "BarWidget.qml", "Panel.qml", "Service.qml",
+    "manifest.json", "BarWidget.qml", "Panel.qml", "Service.qml", "RuntimeService.qml",
     "ui/Action.qml", "ui/Label.qml", "ui/SideControls.qml", "models/Fixture.js",
     "ui/ProfileEditor.qml", "models/ProfileModel.js", "models/EffectiveState.js",
     "models/EditSession.js", "models/FakeEngine.js", "models/ProfileController.js",
+    "models/PersistentState.js", "adapters/StateBridge.qml",
+    "helpers/state_store.py", "helpers/omasound_helper.py",
     "LICENSE", "THIRD_PARTY_NOTICES.md",
 )
 MAX_FILE = 2 * 1024 * 1024
@@ -196,7 +198,7 @@ class Preview:
                         target = temporary / name
                         data = (json.dumps(manifest, indent=2) + "\n").encode()
                     else:
-                        target = temporary / runtime / name if name.endswith((".qml", ".js")) else temporary / name
+                        target = temporary / runtime / name if name.endswith((".qml", ".js", ".py")) else temporary / name
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(data)
                 (temporary / ".omasound-owner").write_text(str(uuid.uuid4()) + "\n")

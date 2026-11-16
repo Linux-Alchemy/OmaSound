@@ -104,3 +104,24 @@ Repeated start does not rescan an unchanged preview or reset its in-memory libra
 The loaded host's dirty native close, host hide and shared Close handler were
 exercised separately from headless tests. These observations do not replace Matt's
 hands-on acceptance or prove live audio/persistence behaviour.
+
+
+## Task 2.2 verification extension
+
+The full model scope adds three stored-state Node tests (20 model tests total),
+fourteen Python filesystem/helper tests (27 Python
+cases total), plus seven real-helper persistence scenarios via `tools/check-runtime`.
+Qt's standalone qmltestrunner cannot load this package's statically registered
+Quickshell process plugin. The pure service remains independently tested there;
+RuntimeService supplies the actual process adapter in a disposable, offscreen
+Quickshell runtime. It has no desktop windows, live audio or production state.
+The runner requires explicit completion markers, fails on warnings/errors, bounds
+runtime and removes its temporary configuration/state. It is not another desktop
+shell. Restart, failed Save, concurrent conflict, lost acknowledgment and rapid
+EQ coalescing exercise the real helper, not a substituted implementation.
+
+Strict project lint/format now covers nine QML components including RuntimeService
+and StateBridge. No tools or dependencies were installed. Storage helpers use
+Python's standard library. Security evidence covers bounded passive JSON, fixed
+operations/paths, private descriptor-based file access and atomic publication;
+marketplace eligibility and real DSP behaviour remain unassessed.

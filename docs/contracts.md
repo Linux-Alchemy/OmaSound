@@ -1,7 +1,7 @@
 # OmaSound contracts
 
-Status: fixture lifecycle and Task 2.1 model implemented under accepted ADRs
-0001 and 0002. Durable storage and live-engine protocols remain undecided.
+Status: fixture lifecycle, profile model and Task 2.2 persistence implemented
+under ADRs 0001 and 0002. Live-engine protocols remain undecided.
 
 ## Window lifecycle
 
@@ -104,15 +104,16 @@ committed EQ, session, fake engine, pending action and errors. Navigation action
 are new/edit/apply/close; dirty navigation requires resolve(save/discard/keep).
 Failed Save preserves the draft and pending action. Service emits closeApproved
 only after resolution, and Panel uses it for UI, host and native close routes.
-Closing retains service state; unloading or stopping preview clears it.
+Closing retains service state. RuntimeService wraps the pure service with
+durable transactions; unloading clears drafts, while saved state survives.
 
 FakeEngine keeps requested and observed EQ separately per side. Each request
 has a monotonically increasing generation; obsolete acknowledgments are ignored.
 Its observations distinguish simulated success, pending, waiting, confirmed
 restoration after failure and uncertainty. Partial failures never imply atomic
 application. These are fixture semantics, not a settled live transport protocol.
-In-memory Save success is independent of engine observation and never promises
-persistence or audible application.
+The pure controller provides Save intent. RuntimeService confirms disk success
+separately from engine observation; neither promises audible application.
 
 ## Preview source identity and transition gate
 
@@ -122,5 +123,58 @@ verify the loaded Panel source URL; changed source requires stop/start. Repeated
 start of unchanged source avoids rescanning the plugin and retains service state.
 
 `./tools/check --scope model --part transitions` adds pure-model and headless
-QML service tests to foundation checks. Full `--scope model` deliberately fails
-until Task 2.2 implements storage tests. See [transition cases](profile-transition-checks.md).
+QML service tests to foundation checks. Full `--scope model` also runs storage and real-helper runtime tests. See [transition cases](profile-transition-checks.md).
+
+
+## Durable fixture state (Task 2.2)
+
+```text
+CommittedValue = { profiles: CustomProfile[0..256], effective: EffectiveState }
+Snapshot = { version: 1, revision: positive safe integer,
+             transaction: string, value: CommittedValue }
+LoadRequest = { version: 1, operation: "load" }
+CommitRequest = { version: 1, operation: "commit", expectedRevision: safe integer,
+                  transaction: string, value: CommittedValue }
+LoadResult = { ok: true, status: "absent" | "loaded", snapshot: Snapshot | null }
+CommitResult = { ok: true, status: "committed", revision: integer, transaction: string }
+ErrorResult = { ok: false, code: "invalid" | "oversized" | "unsafe" | "unavailable"
+                         | "busy" | "conflict" | "uncertain" }
+```
+
+`helpers/omasound_helper.py` accepts exactly one bounded JSON request on stdin,
+with a 1 MiB byte limit and five-second process deadline. Its only operations are
+load and commit. It serializes one ASCII JSON reply within the same byte limit
+before writing stdout. No untrusted subprocess produces collected output; no
+shell or child process is invoked. The QML bridge uses argv, stdin, a six-second
+outer deadline and termination of its owned process on unload. Requests are
+serialized; payloads also have a conservative UTF-8 bound before sending.
+
+The fixed store root is `$XDG_STATE_HOME/omasound-fixture`, falling back to
+`~/.local/state/omasound-fixture`. Tests redirect XDG_STATE_HOME to disposable
+roots. Production paths and migration are outside this task. The root is private
+(0700), files are private regular single-link files (0600); unsafe objects are
+rejected without changing permissions or deleting them. The resolved XDG parent
+is user-owned configuration; the plugin root and leaves reject symlinks. Held
+directory descriptors bind leaf operations. Names and IDs never become paths.
+
+A one-second bounded lock serializes writers. Validate the existing snapshot and
+expected revision before writing. Write/fsync an exclusive temporary, replace
+state.json atomically, then fsync the root before acknowledging. Failure before
+publication preserves the old file. A failure after publication is uncertain;
+retry the same transaction and identical value to confirm it without another
+revision. Abandoned temporary files are ignored, not promoted or broadly deleted.
+Corrupt, unreadable and missing state are distinct; corruption never triggers reset.
+
+RuntimeService installs a candidate library/committed state only after acknowledgment.
+Drafts stay in memory and cannot change the durable snapshot. Failed Save retains
+the editor and pending navigation. Uncertainty blocks competing writes until the
+same request is reconciled. A revision conflict offers explicit reload, rebases
+the retained draft on the latest committed EQ and lets the user retry. No draft
+is silently committed during reload. Confirmed pre-publication errors permit
+editing/retry. Applying a profile and ordinary outside-editor EQ controls persist
+resolved input and output, including independent provenance. Rapid outside-editor
+EQ changes preview immediately and coalesce to one latest pending snapshot.
+
+Closing UI keeps the service; stopping preview unloads it but intentionally retains
+fixture storage. A new service loads only the validated committed snapshot.
+Physical fixture device/volume/mute and per-app changes remain outside storage.
