@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""Explicitly start or stop the fixture in the existing Omarchy shell."""
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+
+from preview_lib import Preview, PreviewError
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mode", choices=["fixture"], default="fixture")
+parser.add_argument("--layout", choices=["baseline"], default="baseline")
+parser.add_argument("--stop", action="store_true")
+args = parser.parse_args()
+preview = Preview(Path(__file__).resolve().parents[1], Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))))
+try:
+    with preview.locked():
+        result = preview.stop() if args.stop else preview.start()
+    print(json.dumps(result, indent=2))
+except (PreviewError, OSError, ValueError) as error:
+    print(json.dumps({"ok": False, "changed": None, "message": str(error)}), file=sys.stderr)
+    sys.exit(1)
