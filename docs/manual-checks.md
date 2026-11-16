@@ -36,8 +36,8 @@ Super + Ctrl + A retain their usual behavior. Nothing starts a second shell.
    The window and temporary EQ entry disappear. Stock audio, other plugins and
    bar settings remain. A second stop reports no owned preview to stop.
 
-Start again if more hands-on checking is needed. A fresh preview starts with
-neutral fixture bands; there is deliberately no profile persistence yet.
+Start again if more hands-on checking is needed. A first run without saved state starts neutral. With Task 2.2, later starts
+restore saved profiles and both committed EQ sides.
 
 If source files change, stop then start to stage the new version. Preview tools
 refuse to overwrite an unowned plugin or remove modified staging; preserve and
@@ -55,7 +55,7 @@ fixture editing behaviour; individual manual actions were not separately logged.
 
 Start the preview as above; run `./tools/check --scope model --part transitions`
 with no dirty editor. The baseline arrangement is still temporary. All processing
-is simulated, and **Save in memory** lasts only until preview unload/stop.
+is simulated. Task 2.2 now labels the action **Save** and confirms disk success.
 
 1. Apply Fixture Gaming, then Fixture Music. Output should say Music; input
    should retain Gaming and its curve. There is no global active-profile label.
@@ -75,8 +75,37 @@ is simulated, and **Save in memory** lasts only until preview unload/stop.
 7. Try Apply or New profile while editing: the same three choices must resolve
    the draft before navigation. Name a profile `<b>literal</b>`: it must display
    those characters as text, without interpreting markup.
-8. Stop/start preview. This task deliberately returns to a neutral state and
-   the two synthetic factories. Restart persistence belongs to Task 2.2.
+8. Stop/start preview. This task now restores
+   saved custom profiles and the last committed EQ on both sides. Abandoned
+   drafts must be absent.
 
 Failure injection, missing-device observation and stale completion ordering are
 covered by model/service tests; there is no live engine to exercise here.
+
+
+## Task 2.2: persistence checkpoint
+
+Matt accepted the working persistence fixture and Phase 2 on 2026-11-16. This
+records overall acceptance; individual manual-test actions were not separately
+logged. Changes to the selected-profile display were explicitly deferred; the
+current presentation is not a final design decision.
+
+1. Run `./tools/check --scope model` with a clean editor. It includes seven
+   real-helper scenarios in a disposable offscreen runtime, without desktop
+   windows or audio access.
+2. Apply Gaming, then Music; save a named input-only or combined custom profile.
+   Wait for the storage message to confirm Save. Stop/start preview and check
+   that names, gains, enabled flags and independent side labels return.
+3. Edit a saved profile without saving. Stop/start preview: the last committed
+   settings should return and the abandoned draft should be absent.
+4. Test rapid band movements outside the editor; wait for Saved, then restart.
+   The final movement should survive. Volume/mute/device fixtures deliberately
+   reset; they are not EQ profile content.
+
+The private fixture snapshot lives under `$XDG_STATE_HOME/omasound-fixture`
+(default `~/.local/state/omasound-fixture`). Preview cleanup retains it deliberately.
+No automatic migration of Task 2.1's old in-memory library is provided. Corruption,
+concurrent writers and interrupted writes are tested only in disposable roots;
+do not damage your saved fixture data to repeat those tests. If storage is blocked,
+read its error and use Retry/reload after resolving the cause. Rejected files are
+preserved; the app does not silently reset them.

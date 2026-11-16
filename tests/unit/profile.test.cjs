@@ -129,3 +129,38 @@ function newDraft() { let s = action(initial(), 'new'); s = edit(s, {kind:'name'
     const s=newDraft();freeze(s);const before=plain(s);const bad=edit(s,{kind:'gain',side:'output',index:20,value:3});
     assert.notEqual(bad.error,'');assert.deepEqual(plain(s),before);assert.deepEqual(plain(bad.session),before.session);
  });
+
+const S = load(path.join(__dirname, '../../models/PersistentState.js'));
+test('stored snapshot omits physical state and drafts; restore preserves independent origins', () => {
+    let state=action(initial(),'apply',{id:'factory-fixture-gaming'});
+    state=action(state,'apply',{id:'factory-fixture-music'});
+    const committed=plain(state.committed);
+    state=action(state,'new');state=edit(state,{kind:'include',side:'input',value:true});
+    state=edit(state,{kind:'gain',side:'input',index:0,value:10});
+    freeze(state);
+    const stored=S.value(state);freeze(stored);
+    assert.deepEqual(Object.keys(stored).sort(),['effective','profiles']);
+    assert.deepEqual(plain(stored.effective),committed);
+    const restored=S.restore(initial(),stored);
+    assert.equal(restored.committed.input.source.name,'Fixture Gaming');
+    assert.equal(restored.committed.output.source.name,'Fixture Music');
+    assert.equal(restored.session,null);
+});
+test('storage validation rejects unsupported state, duplicate identities and excessive libraries', () => {
+    const valid=S.value(action(newDraft(),'save'));
+    assert.doesNotThrow(()=>S.validate(valid));
+    for (const change of [v=>v.volume=4,v=>v.profiles.push(plain(v.profiles[0])),v=>v.profiles=Array(257).fill(v.profiles[0]),v=>v.effective.input.source={id:'custom-missing',revision:1,name:'Missing'}]) {
+        const broken=plain(valid);change(broken);assert.throws(()=>S.validate(broken));
+    }
+    assert.notEqual(P.nameError('\ud800',[],''),'');
+});
+test('explicit storage reload rebases a retained draft without replacing its curve or pending close', () => {
+    let old=action(newDraft(),'save');const id=old.profiles.at(-1).id;
+    let draft=action(old,'edit',{id});draft=edit(draft,{kind:'gain',side:'output',index:0,value:6});draft=action(draft,'close');
+    let newer=plain(old);newer.profiles.at(-1).revision=5;newer.committed.input.eq.gains[0]=4;
+    const restored=S.restore(draft,S.value(newer));
+    assert.equal(restored.session.revision,6);assert.equal(restored.session.curves.output.gains[0],6);
+    assert.equal(restored.session.baseline.input.eq.gains[0],4);assert.equal(restored.pendingAction.kind,'close');
+    const saved=action(restored,'resolve',{choice:'save'});
+    assert.equal(saved.committed.input.eq.gains[0],4);assert.equal(saved.closeRequested,true);
+});

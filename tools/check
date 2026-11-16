@@ -15,8 +15,8 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--scope", required=True)
 parser.add_argument("--part")
 args = parser.parse_args()
-if args.scope == "model" and args.part != "transitions":
-    parser.error("Full model scope requires Task 2.2 storage checks; use --scope model --part transitions")
+if args.scope == "model" and args.part not in (None, "transitions"):
+    parser.error("Unknown model part")
 if args.scope not in ("foundation", "model") or (args.scope == "foundation" and args.part):
     parser.error(f"Scope {args.scope!r} is not implemented; no gate passed")
 repo = Path(__file__).resolve().parents[1]
@@ -40,7 +40,7 @@ try:
         imports = root / "imports"
         imports.mkdir()
         (imports / "qs").symlink_to("/usr/share/omarchy/shell", target_is_directory=True)
-        qml = sorted(str(p) for p in repo.glob("*.qml")) + sorted(str(p) for p in (repo / "ui").glob("*.qml"))
+        qml = sorted(str(p) for p in repo.glob("*.qml")) + sorted(str(p) for folder in ("ui", "adapters") for p in (repo / folder).glob("*.qml"))
         if set(qml) != {str(repo / f) for f in FILES if f.endswith(".qml")}:
             raise PreviewError("QML coverage differs from the explicit staged component list")
         run(["/usr/lib/qt6/bin/qmllint", "--ignore-settings", "-W", "0", "-I", str(imports), *qml])
@@ -54,9 +54,11 @@ try:
         run(["/usr/bin/node", "--test", "--test-isolation=none", "tests/unit/profile.test.cjs"])
         run(["env", "QT_QPA_PLATFORM=offscreen", "QT_QPA_PLATFORMTHEME=generic", "QT_QUICK_CONTROLS_STYLE=Basic",
              "/usr/lib/qt6/bin/qmltestrunner", "-input", "tests/qml", "-o", "-,txt"])
+        if args.part is None:
+            run([str(repo / "tools/check-runtime")])
     suite = unittest.TestLoader().discover("tests/integration", pattern="test_*.py")
-    if suite.countTestCases() < 13:
-        raise PreviewError("Missing required foundation preview tests (expected at least thirteen)")
+    if suite.countTestCases() < 27:
+        raise PreviewError("Missing required foundation preview tests (expected at least twenty-seven)")
     run([sys.executable, "-m", "unittest", "discover", "-s", "tests/integration", "-p", "test_*.py", "-v"])
     run(["git", "diff", "--check"])
     ignored = subprocess.run(["git", "check-ignore", "PLAN.md", "local/evidence/phase-1"], capture_output=True, text=True, check=True)
@@ -76,6 +78,8 @@ try:
         if (status.get("width"), status.get("height")) != (1200, 800):
             raise PreviewError(f"Fixture geometry differs: {status}")
         print("Host fixture load: " + json.dumps(status), flush=True)
+        if status.get("storage") != "ready":
+            raise PreviewError("Fixture storage is not ready; inspect its visible error before proceeding")
         if status.get("dirty") or status.get("prompt"):
             raise PreviewError("Resolve the active draft before running host lifecycle checks; it was preserved")
         for _ in range(2):

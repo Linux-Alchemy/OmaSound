@@ -9,7 +9,7 @@ ColumnLayout {
     required property var service
     readonly property var sideState: service ? service.state[side] : null
     readonly property var eq: service ? service.effective[side].eq : null
-    readonly property bool editable: !!service && !service.profileState.pendingAction && (!service.profileState.session || service.profileState.session.included[side])
+    readonly property bool editable: !!service && !service.eqBlocked && !service.profileState.pendingAction && (!service.profileState.session || service.profileState.session.included[side])
     spacing: 12
 
     Label {

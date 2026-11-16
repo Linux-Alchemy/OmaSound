@@ -20,6 +20,7 @@ function normalizeName(value) { return typeof value === "string" ? value.trim().
 function nameError(value, library, ownId) {
     if (typeof value !== "string" || value.length > 256 || /[\u0000-\u001f\u007f-\u009f]/.test(value)) return "Use a name without control characters.";
     var name = normalizeName(value);
+    if (Array.from(name).some(function (c) { var n = c.codePointAt(0); return n >= 0xd800 && n <= 0xdfff; })) return "Use a valid Unicode name.";
     if (!name || Array.from(name).length > 64) return "Use a name from 1 to 64 characters.";
     if ((library || []).some(function (p) { return p.id !== ownId && normalizeName(p.name).toLowerCase() === name.toLowerCase(); })) return "That profile name is already in use.";
     return "";

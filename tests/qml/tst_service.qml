@@ -6,7 +6,7 @@ TestCase {
     id: root
     name: "ProfileService"
     property var service: null
-    Component { id: factory; App.Service {} }
+    Component { id: factory; App.Service { persistenceEnabled: false } }
     SignalSpy { id: closed; target: root.service; signalName: "closeApproved" }
 
     function init() {
