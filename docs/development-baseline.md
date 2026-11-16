@@ -1,6 +1,6 @@
 # Development baseline
 
-Inspected and implemented 2026-11-15. Foundation engineering checks pass on this
+Foundation inspected 2026-11-15; Task 2.1 extended 2026-11-16. Foundation engineering checks pass on this
 baseline; Matt accepted Phase 1 window behavior on 2026-11-15.
 
 | Component | Installed package |
@@ -63,13 +63,13 @@ Python uses the existing system standard library only.
 
 The check resolves `qs` to the installed shell through a temporary import-path
 symlink outside the staged plugin, runs Qt 6 lint with `--ignore-settings -W 0`,
-compares qmlformat output byte-for-byte, runs four Node fixture tests and twelve
+compares qmlformat output byte-for-byte, runs four Node fixture tests and thirteen
 Python cleanup/ownership tests, checks Git hygiene and inspects the running host.
 To apply QML formatting: `/usr/lib/qt6/bin/qmlformat -i FILE.qml`.
 
 The staged plugin contains no symlinks. The checker requires the matching preview
 already running, and briefly hides/reopens it to verify instance reuse. `hyprctl
-clients -j` confirms one floating 1200 × 800 client. Future scopes return nonzero.
+clients -j` confirms one floating 1200 × 800 client. Unimplemented scopes return nonzero.
 No build/compiler/native sanitizer step is applicable to this QML/JS/Python slice.
 
 The host emits its known scanner warnings that external plugin QML directories
@@ -89,3 +89,18 @@ window behaves as expected and accepted the Phase 1 lifecycle. Individual
 manual-test observations were not recorded separately. Security evidence:
 fixture-only source review plus bounded input and owned-cleanup tests. Marketplace
 eligibility: not assessed; the development identity is not a release candidate.
+
+
+Task 2.1 adds seventeen pure-model Node tests and five QML service scenarios
+(seven QtTest passes including setup/cleanup). The canonical transition scope
+uses `/usr/lib/qt6/bin/qmltestrunner` with `QT_QPA_PLATFORM=offscreen`,
+`QT_QPA_PLATFORMTHEME=generic` and `QT_QUICK_CONTROLS_STYLE=Basic`. This exercises
+the actual Service.qml under Qt without requiring another desktop shell.
+
+The thirteen Python cases also check stale loaded-source rejection and distinct
+runtime paths after source changes. The installed host was observed to cache QML
+across same-path staging; source-specific runtime directories prevent that reuse.
+Repeated start does not rescan an unchanged preview or reset its in-memory library.
+The loaded host's dirty native close, host hide and shared Close handler were
+exercised separately from headless tests. These observations do not replace Matt's
+hands-on acceptance or prove live audio/persistence behaviour.

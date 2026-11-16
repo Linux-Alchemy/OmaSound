@@ -14,6 +14,7 @@ Item {
     property var shell: null
     property var service: null
     property bool closingFromHost: false
+    property bool allowClose: false
     property int openCount: 0
     readonly property bool opened: window.visible
     readonly property string instanceId: Date.now().toString() + "-" + Math.random().toString(16).slice(2)
@@ -35,27 +36,62 @@ Item {
         });
     }
 
-    function close(): void {
+    function hideApproved(): void {
+        root.allowClose = true;
+        if (root.shell)
+            root.shell.hide("linux-alchemy.omasound-dev");
         root.closingFromHost = true;
         window.visible = false;
         root.closingFromHost = false;
+        root.allowClose = false;
+    }
+
+    function close(): void {
+        if (root.allowClose) {
+            window.visible = false;
+            return;
+        }
+        root.requestClose();
     }
 
     function requestClose(): void {
-        if (root.shell)
-            root.shell.hide("linux-alchemy.omasound-dev");
+        if (root.service)
+            root.service.dispatch({
+                kind: "close"
+            });
         else
-            root.close();
+            root.hideApproved();
+    }
+
+    Connections {
+        target: root.service
+        function onCloseApproved(): void {
+            root.hideApproved();
+        }
+    }
+
+    Connections {
+        target: contents.Window.window
+        function onClosing(event): void {
+            if (!root.allowClose) {
+                event.accepted = false;
+                root.requestClose();
+            }
+        }
     }
 
     // Small read-only diagnostic for tools/preview; never an audio command path.
     function status(unused: string): string {
         return JSON.stringify({
             mode: "fixture",
+            sourceUrl: String(Qt.resolvedUrl("Panel.qml")),
             visible: root.opened,
             instance: root.instanceId,
             opens: root.openCount,
             ready: !!root.service && root.service.mode === "fixture",
+            dirty: !!root.service && !!root.service.profileState.session && root.service.profileState.session.dirty,
+            prompt: !!root.service && !!root.service.profileState.pendingAction,
+            profiles: root.service ? root.service.profileState.profiles.length : 0,
             width: window.width,
             height: window.height
         });
@@ -72,8 +108,12 @@ Item {
         minimumSize: Qt.size(1200, 800)
         maximumSize: Qt.size(1200, 800)
         onVisibleChanged: {
-            if (!visible && !root.closingFromHost && root.shell)
-                root.shell.hide("linux-alchemy.omasound-dev");
+            if (!visible && !root.closingFromHost && !root.allowClose) {
+                // Fallback for a compositor/platform that hides before closing.
+                if (root.service && root.service.profileState.session && root.service.profileState.session.dirty)
+                    window.visible = true;
+                root.requestClose();
+            }
         }
 
         ColumnLayout {
@@ -100,6 +140,10 @@ Item {
             Ui.Label {
                 Layout.fillWidth: true
                 text: "Synthetic devices and controls. Your sound is untouched. This arrangement is temporary."
+            }
+            Ui.ProfileEditor {
+                Layout.fillWidth: true
+                service: root.service
             }
             Controls.ScrollView {
                 Layout.fillWidth: true
@@ -154,7 +198,7 @@ Item {
                 }
             }
             Ui.Label {
-                text: "Profiles and live EQ arrive in later phases. Close preserves this fixture until preview stop."
+                text: "Profiles are saved in memory only. Close preserves them; preview stop clears them. Live audio is untouched."
             }
         }
     }

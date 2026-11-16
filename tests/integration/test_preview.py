@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 from preview_lib import FILES, PLUGIN_ID, Preview, PreviewError, read_regular
@@ -18,7 +19,7 @@ class PreviewTests(unittest.TestCase):
         for name in FILES:
             target = self.repo / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(json.dumps({"id": PLUGIN_ID}) if name == "manifest.json" else "fixture\n")
+            target.write_text(json.dumps({"id": PLUGIN_ID, "entryPoints": {"panel": "Panel.qml"}}) if name == "manifest.json" else "fixture\n")
         self.config_home = root / "config"
         self.preview = Preview(self.repo, self.config_home, self.call)
         self.preview.config.parent.mkdir(parents=True)
@@ -57,8 +58,12 @@ class PreviewTests(unittest.TestCase):
         if method == "hide":
             self.visible = False
         if method == "call":
-            return json.dumps({"mode": "fixture", "ready": True, "visible": self.visible, "instance": "one"}) if self.enabled else "unknown"
+            return json.dumps({"mode": "fixture", "ready": True, "visible": self.visible, "instance": "one", "sourceUrl": "file://" + str(self.staged_panel())}) if self.enabled else "unknown"
         return ""
+
+    def staged_panel(self):
+        record = json.loads(self.preview.record.read_text())
+        return self.preview.stage / record["runtime"] / "Panel.qml"
 
     def start(self):
         with self.preview.locked():
@@ -73,6 +78,7 @@ class PreviewTests(unittest.TestCase):
         self.assertTrue(self.start()["changed"])
         self.assertFalse(self.start()["changed"])
         self.assertEqual(sum(method == "enablePlugin" for method, _ in self.calls), 1)
+        self.assertEqual(sum(method == "rescanPlugins" for method, _ in self.calls), 1)
         self.assertEqual(set(p.name for p in self.preview.stage.iterdir()) & {"local", "PLAN.md", ".git", "tests"}, set())
         self.assertTrue(self.stop()["changed"])
         self.assertEqual(self.config, before)
@@ -106,7 +112,7 @@ class PreviewTests(unittest.TestCase):
 
     def test_modified_stage_survives_stop(self):
         self.start()
-        target = self.preview.stage / "Panel.qml"
+        target = self.staged_panel()
         target.write_text("user edit")
         with self.assertRaises(PreviewError):
             self.stop()
@@ -115,7 +121,7 @@ class PreviewTests(unittest.TestCase):
 
     def test_symlink_in_stage_is_not_followed(self):
         self.start()
-        target = self.preview.stage / "Panel.qml"
+        target = self.staged_panel()
         target.unlink()
         target.symlink_to(self.repo / "Panel.qml")
         with self.assertRaises(PreviewError):
@@ -124,12 +130,32 @@ class PreviewTests(unittest.TestCase):
 
     def test_checkout_changes_require_stop_before_restage(self):
         self.start()
+        old_panel = self.staged_panel()
         (self.repo / "Panel.qml").write_text("new version")
         with self.assertRaises(PreviewError):
             self.start()
         self.stop()
         self.start()
-        self.assertEqual((self.preview.stage / "Panel.qml").read_text(), "new version")
+        self.assertNotEqual(self.staged_panel(), old_panel)
+        self.assertEqual(self.staged_panel().read_text(), "new version")
+
+    def test_rejects_stale_loaded_source_even_when_ready(self):
+        self.start()
+        record = json.loads(self.preview.record.read_text())
+        original = self.preview.call
+
+        def stale(method, *args):
+            answer = original(method, *args)
+            if method == "call":
+                status = json.loads(answer)
+                status["sourceUrl"] = "file:///old-runtime/Panel.qml"
+                return json.dumps(status)
+            return answer
+
+        self.preview.call = stale
+        with patch("preview_lib.time.monotonic", side_effect=[0, 0, 9]), patch("preview_lib.time.sleep"):
+            with self.assertRaises(PreviewError):
+                self.preview.wait_status(True, record["runtime"])
 
     def test_enable_failure_is_recoverable(self):
         self.fail_enable = True
